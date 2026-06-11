@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode System — Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>Barcode Inventory System</h1>
+        <div class="user-info">
+            <span>User: <span class="username">{{ username }}</span></span>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <div class="scan-bar">
+        <input type="text" id="scan-input" placeholder="Scan barcode or type to search..." autofocus>
+        <button onclick="lookupBarcode()">Lookup</button>
+        <button onclick="handleScan()">Scan</button>
+    </div>
+
+    <div class="main-content">
+        <div class="table-section">
+            <div class="table-header">
+                <h2>Items</h2>
+                <span class="count" id="item-count">Total: 0</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:150px">Barcode</th>
+                            <th>Name</th>
+                            <th style="width:60px; text-align:center;">Qty</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-body"></tbody>
+                </table>
+                <div class="empty-state" id="empty-state">
+                    <div class="icon">📦</div>
+                    <h3>No items yet</h3>
+                    <p>Scan a barcode above to add your first item.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <div class="detail-header">
+                <h2>Item Details</h2>
+            </div>
+            <div class="detail-body">
+                <div class="field">
+                    <label>Barcode</label>
+                    <div class="value barcode-value" id="detail-barcode">—</div>
+                </div>
+                <div class="field">
+                    <label>Name</label>
+                    <input type="text" id="detail-name" placeholder="Item name...">
+                </div>
+                <div class="field">
+                    <label>Category</label>
+                    <select id="detail-category">
+                        <option value="Uncategorized">Uncategorized</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Books">Books</option>
+                        <option value="Tools">Tools</option>
+                        <option value="Food">Food</option>
+                        <option value="Clothing">Clothing</option>
+                        <option value="Office">Office</option>
+                        <option value="Medical">Medical</option>
+                        <option value="Automotive">Automotive</option>
+                        <option value="Sports">Sports</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Quantity</label>
+                    <input type="number" id="detail-qty" value="1" min="1">
+                </div>
+                <div class="field">
+                    <label>Location</label>
+                    <input type="text" id="detail-location" placeholder="Shelf, room, etc.">
+                </div>
+                <div class="field">
+                    <label>Notes</label>
+                    <textarea id="detail-notes" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn-save" onclick="saveItem()">Save</button>
+                    <button class="btn-delete" onclick="deleteItem()">Delete</button>
+                    <button class="btn-clear" onclick="clearDetails()">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentItemId = null;
+        let allItems = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadItems();
+
+            document.getElementById('scan-input').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    lookupBarcode();
+                }
+            });
+
+            document.getElementById('scan-input').addEventListener('input', function() {
+                const val = this.value.trim();
+                if (val.length >= 2) loadItems(val);
+                else if (val.length === 0) loadItems();
+            });
+
+            document.getElementById('inventory-body').addEventListener('click', function(e) {
+                const row = e.target.closest('tr');
+                if (row && row.dataset.id) selectItem(parseInt(row.dataset.id));
+            });
+        });
+
+        function loadItems(search) {
+            let url = '/api/items';
+            if (search) url += '?search=' + encodeURIComponent(search);
+            fetch(url).then(r => r.json()).then(data => {
+                allItems = data.items;
+                renderTable(data.items);
+                document.getElementById('item-count').textContent = 'Total: ' + data.total;
+            });
+        }
+
+        function lookupBarcode() {
+            const barcode = document.getElementById('scan-input').value.trim();
+            if (!barcode) return;
+
+            fetch('/api/items/lookup?barcode=' + encodeURIComponent(barcode))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.found && data.item) {
+                        selectItem(data.item.id);
+                        document.getElementById('scan-input').value = '';
+                        document.getElementById('scan-input').focus();
+                        toast('Found: ' + data.item.name, 'success');
+                    } else {
+                        clearDetails();
+                        document.getElementById('detail-barcode').textContent = barcode;
+                        document.getElementById('detail-name').focus();
+                        toast('New barcode — enter details and save', 'info');
+                    }
+                });
+        }
+
+        function handleScan() { lookupBarcode(); }
+
+        function selectItem(itemId) {
+            const item = allItems.find(i => i.id === itemId);
+            if (!item) return;
+            displayItem(item);
+            document.querySelectorAll('#inventory-body tr').forEach(r => r.classList.remove('selected'));
+            const row = document.querySelector(`#inventory-body tr[data-id="${itemId}"]`);
+            if (row) row.classList.add('selected');
+        }
+
+        function displayItem(item) {
+            currentItemId = item.id;
+            document.getElementById('detail-barcode').textContent = item.barcode;
+            document.getElementById('detail-name').value = item.name;
+            document.getElementById('detail-category').value = item.category;
+            document.getElementById('detail-qty').value = item.quantity;
+            document.getElementById('detail-location').value = item.location || '';
+            document.getElementById('detail-notes').value = item.notes || '';
+        }
+
+        function clearDetails() {
+            currentItemId = null;
+            document.getElementById('detail-barcode').textContent = '—';
+            document.getElementById('detail-name').value = '';
+            document.getElementById('detail-category').value = 'Uncategorized';
+            document.getElementById('detail-qty').value = 1;
+            document.getElementById('detail-location').value = '';
+            document.getElementById('detail-notes').value = '';
+            document.querySelectorAll('#inventory-body tr').forEach(r => r.classList.remove('selected'));
+        }
+
+        function saveItem() {
+            const barcode = document.getElementById('detail-barcode').textContent;
+            const name = document.getElementById('detail-name').value.trim();
+
+            if (barcode === '—') { toast('Scan a barcode first', 'error'); return; }
+            if (!name) { toast('Item name is required', 'error'); return; }
+
+            const payload = {
+                barcode: barcode,
+                name: name,
+                category: document.getElementById('detail-category').value,
+                quantity: parseInt(document.getElementById('detail-qty').value) || 1,
+                location: document.getElementById('detail-location').value.trim(),
+                notes: document.getElementById('detail-notes').value.trim()
+            };
+
+            let url = '/api/items';
+            let method = 'POST';
+            if (currentItemId) { url = '/api/items/' + currentItemId; method = 'PUT'; }
+
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    toast(data.message, 'success');
+                    loadItems(document.getElementById('scan-input').value.trim());
+                    clearDetails();
+                } else {
+                    toast(data.error || 'Error saving item', 'error');
+                }
+            });
+        }
+
+        function deleteItem() {
+            if (!currentItemId) { toast('Select an item first', 'error'); return; }
+            if (!confirm('Delete this item?')) return;
+
+            fetch('/api/items/' + currentItemId, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    toast(data.message, 'info');
+                    loadItems(document.getElementById('scan-input').value.trim());
+                    clearDetails();
+                });
+        }
+
+        function renderTable(items) {
+            const tbody = document.getElementById('inventory-body');
+            const empty = document.getElementById('empty-state');
+            tbody.innerHTML = '';
+            if (items.length === 0) { empty.style.display = 'block'; return; }
+            empty.style.display = 'none';
+
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.dataset.id = item.id;
+                tr.innerHTML = `
+                    <td class="barcode">${item.barcode}</td>
+                    <td>${item.name}</td>
+                    <td class="qty">${item.quantity}</td>
+                    <td>${item.category}</td>
+                    <td>${item.location || '—'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function toast(message, type) {
+            const el = document.createElement('div');
+            el.className = 'toast ' + type;
+            el.textContent = message;
+            document.body.appendChild(el);
+            setTimeout(() => { el.remove(); }, 3500);
+        }
+    </script>
+</body>
+</html>
