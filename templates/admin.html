@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode System — Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>Admin Console</h1>
+        <div class="user-info">
+            <a href="{{ url_for('dashboard') }}" class="logout-btn">Dashboard</a>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <main class="admin-page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages admin-flashes">
+                    {% for category, message in messages %}
+                        <div class="flash-message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <section class="stats-grid">
+            <div class="stat-card"><span>Total Users</span><strong>{{ stats.users }}</strong></div>
+            <div class="stat-card"><span>Item Records</span><strong>{{ stats.items }}</strong></div>
+            <div class="stat-card"><span>Total Quantity</span><strong>{{ stats.quantity }}</strong></div>
+            <div class="stat-card"><span>Categories</span><strong>{{ stats.categories }}</strong></div>
+        </section>
+
+        <section class="admin-panel">
+            <div class="table-header"><h2>User Management</h2></div>
+            <div class="table-wrap admin-table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>User</th><th>Email</th><th>Role</th><th>Items</th><th>Quantity</th><th>Created</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{% if user.is_admin %}<span class="badge admin">Admin</span>{% else %}<span class="badge">User</span>{% endif %}</td>
+                            <td>{{ user.item_count }}</td>
+                            <td>{{ user.total_quantity }}</td>
+                            <td>{{ user.created_at }}</td>
+                            <td class="admin-actions">
+                                <form method="POST" action="{{ url_for('admin_toggle_user', user_id=user.id) }}">
+                                    <input type="hidden" name="is_admin" value="{{ 0 if user.is_admin else 1 }}">
+                                    <button type="submit">{{ 'Remove Admin' if user.is_admin else 'Make Admin' }}</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}" onsubmit="return confirm('Delete this user and all items?')">
+                                    <button class="danger" type="submit">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="admin-panel">
+            <div class="table-header"><h2>Recent Inventory Updates</h2></div>
+            <div class="table-wrap admin-table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Owner</th><th>Barcode</th><th>Name</th><th>Qty</th><th>Category</th><th>Location</th><th>Updated</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.username }}</td><td class="barcode">{{ item.barcode }}</td><td>{{ item.name }}</td>
+                            <td class="qty">{{ item.quantity }}</td><td>{{ item.category }}</td><td>{{ item.location or '—' }}</td><td>{{ item.last_updated }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7">No inventory yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

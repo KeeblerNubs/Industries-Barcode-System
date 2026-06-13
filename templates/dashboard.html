@@ -11,6 +11,7 @@
         <h1>Barcode Inventory System</h1>
         <div class="user-info">
             <span>User: <span class="username">{{ username }}</span></span>
+            {% if is_admin %}<a href="{{ url_for('admin') }}" class="logout-btn">Admin</a>{% endif %}
             <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
         </div>
     </div>
@@ -247,15 +248,20 @@
             items.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.dataset.id = item.id;
-                tr.innerHTML = `
-                    <td class="barcode">${item.barcode}</td>
-                    <td>${item.name}</td>
-                    <td class="qty">${item.quantity}</td>
-                    <td>${item.category}</td>
-                    <td>${item.location || '—'}</td>
-                `;
+                appendCell(tr, item.barcode, 'barcode');
+                appendCell(tr, item.name);
+                appendCell(tr, item.quantity, 'qty');
+                appendCell(tr, item.category);
+                appendCell(tr, item.location || '—');
                 tbody.appendChild(tr);
             });
+        }
+
+        function appendCell(row, value, className) {
+            const cell = document.createElement('td');
+            if (className) cell.className = className;
+            cell.textContent = value;
+            row.appendChild(cell);
         }
 
         function toast(message, type) {
