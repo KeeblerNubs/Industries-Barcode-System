@@ -104,6 +104,7 @@
         let allItems = [];
 
         document.addEventListener('DOMContentLoaded', function() {
+            removeUnwantedOverlays();
             loadItems();
 
             document.getElementById('scan-input').addEventListener('keydown', function(e) {
@@ -124,6 +125,31 @@
                 if (row && row.dataset.id) selectItem(parseInt(row.dataset.id));
             });
         });
+
+
+        function removeUnwantedOverlays() {
+            const blockedPhrases = [
+                "TONIGHT'S VIBE",
+                'CLEAN AUDIO, REAL PEOPLE.',
+                'FN LOCK'
+            ];
+
+            function pruneInjectedElements() {
+                Array.from(document.body.children).forEach(element => {
+                    if (element.tagName === 'SCRIPT') return;
+                    const text = element.textContent.toUpperCase();
+                    if (blockedPhrases.some(phrase => text.includes(phrase))) {
+                        element.remove();
+                    }
+                });
+            }
+
+            pruneInjectedElements();
+            new MutationObserver(pruneInjectedElements).observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
 
         function loadItems(search) {
             let url = '/api/items';
